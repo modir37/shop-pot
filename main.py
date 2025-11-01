@@ -1,4 +1,4 @@
-import os
+ import os
 import threading
 from flask import Flask
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
@@ -7,6 +7,7 @@ from telegram.ext import Application, CommandHandler, CallbackQueryHandler, Cont
 TOKEN = os.getenv("TOKEN")
 ADMIN_ID = int(os.getenv("ADMIN_ID"))
 PDF_FILE = "book.pdf"
+SUPPORT_USERNAME = "NoTanCoach"  # 🔄 یوزرنیم خودت رو اینجا بذار
 
 # دیتابیس ساده در حافظه
 user_data = {}
@@ -22,20 +23,29 @@ def run_web():
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
+    cart_count = len(user_data.get(user_id, {}).get("cart", []))
     
     keyboard = [
         [InlineKeyboardButton("📚 محصولات دیجیتال", callback_data="products")],
-        [InlineKeyboardButton("🛒 سبد خرید (۰)", callback_data="cart")],
+        [InlineKeyboardButton(f"🛒 سبد خرید ({cart_count})", callback_data="cart")],
         [InlineKeyboardButton("💳 پرداخت", callback_data="payment")],
         [InlineKeyboardButton("📞 پشتیبانی", callback_data="support")],
         [InlineKeyboardButton("👤 حساب کاربری", callback_data="profile")]
     ]
     
-    await update.message.reply_text(
-        f"🛍️ به فروشگاه آموزشی خوش آمدید، {update.effective_user.first_name}!\n\n"
-        "لطفاً گزینه مورد نظر را انتخاب کنید:",
-        reply_markup=InlineKeyboardMarkup(keyboard)
-    )
+    if isinstance(update, Update) and update.message:
+        await update.message.reply_text(
+            f"🛍️ به فروشگاه آموزشی خوش آمدید، {update.effective_user.first_name}!\n\n"
+            "لطفاً گزینه مورد نظر را انتخاب کنید:",
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
+    else:
+        query = update.callback_query
+        await query.edit_message_text(
+            f"🛍️ به فروشگاه آموزشی خوش آمدید، {query.from_user.first_name}!\n\n"
+            "لطفاً گزینه مورد نظر را انتخاب کنید:",
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
 
 async def products_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = [
@@ -65,7 +75,6 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await products_menu(update, context)
     
     elif query.data == "buy_book":
-        # اضافه به سبد خرید
         if user_id not in user_data:
             user_data[user_id] = {"cart": [], "purchases": 0}
         user_data[user_id]["cart"].append("کتاب آموزشی پایتون - ۱۰۰,۰۰۰ تومان")
@@ -74,29 +83,61 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await show_cart(update, context)
     
     elif query.data == "buy_course":
-        await query.edit_message_text("🎥 دوره ویدیویی به زودی اضافه خواهد شد!")
+        keyboard = [
+            [InlineKeyboardButton("📚 مشاهده محصولات دیگر", callback_data="products")],
+            [InlineKeyboardButton("🔙 برگشت به منوی اصلی", callback_data="back_main")]
+        ]
+        await query.edit_message_text(
+            "🎥 دوره ویدیویی تلگرام\n\n"
+            "به زودی اضافه خواهد شد...\n"
+            "برای اطلاع از جدیدترین محصولات، پیگیر ما باشید!",
+            reply_markup=InlineKeyboardMarkup(keyboard),
+            parse_mode="Markdown"
+        )
     
-    elif query.data == "buy_package":
-        await query.edit_message_text("📦 پکیج کامل به زودی اضافه خواهد شد!")
+    elif query.data == "buy_package":  
+        keyboard = [
+            [InlineKeyboardButton("📚 مشاهده محصولات دیگر", callback_data="products")],
+            [InlineKeyboardButton("🔙 برگشت به منوی اصلی", callback_data="back_main")]
+        ]
+        await query.edit_message_text(
+            "📦 پکیج کامل\n\n"
+            "به زودی اضافه خواهد شد...\n"
+            "برای اطلاع از جدیدترین محصولات، پیگیر ما باشید!",
+            reply_markup=InlineKeyboardMarkup(keyboard),
+            parse_mode="Markdown"
+        )
     
     elif query.data == "cart":
         await show_cart(update, context)
+    
+    elif query.data == "clear_cart":
+        # 🔥 درست کردن مشکل خالی کردن سبد
+        if user_id in user_data:
+            user_data[user_id]["cart"] = []
+        await query.answer("✅ سبد خرید خالی شد!", show_alert=True)
+        await start(update, context)
     
     elif query.data == "payment":
         await process_payment(update, context)
     
     elif query.data == "support":
+        keyboard = [
+            [InlineKeyboardButton("🔙 برگشت به منوی اصلی", callback_data="back_main")]
+        ]
         await query.edit_message_text(
-            "📞 پشتیبانی:\n\n"
-            "برای ارتباط با پشتیبانی و پاسخ به سوالات:\n"
-            "👤 @YourSupportUsername\n\n"
-            "ساعات پاسخگویی: ۹ صبح تا ۶ عصر",
-            parse_mode="Markdown"
+            f"📞 پشتیبانی:\n\n"
+            f"برای ارتباط با پشتیبانی و پاسخ به سوالات:\n"
+            f"👤 @{SUPPORT_USERNAME}\n\n"
+            f"ساعات پاسخگویی: ۹ صبح تا ۶ عصر",
+            parse_mode="Markdown",
+            reply_markup=InlineKeyboardMarkup(keyboard)
         )
     
     elif query.data == "profile":
         user = query.from_user
         purchases = user_data.get(user_id, {}).get("purchases", 0)
+        cart_count = len(user_data.get(user_id, {}).get("cart", []))
         
         await query.edit_message_text(
             f"👤 حساب کاربری:\n\n"
@@ -104,6 +145,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"👤 نام: {user.first_name}\n"
             f"📧 یوزرنیم: @{user.username if user.username else 'ندارد'}\n"
             f"🛍️ تعداد خریدها: {purchases}\n"
+            f"🛒 آیتم‌ها در سبد: {cart_count}\n"
             f"⭐ وضعیت: کاربر عادی",
             parse_mode="Markdown",
             reply_markup=InlineKeyboardMarkup([[
@@ -112,7 +154,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
     
     elif query.data == "back_main":
-        await start_from_callback(update, context)
+        await start(update, context)
     
     elif query.data == "checkout":
         await finalize_payment(update, context)
@@ -152,8 +194,10 @@ async def process_payment(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.edit_message_text(
         "💳 درگاه پرداخت:\n\n"
-        "در حال حاضر درگاه پرداخت تستی فعال است.\n"
-        "برای تست ربات، از منوی محصولات یک آیتم انتخاب کنید.",
+        "در حال حاضر درگاه پرداخت فعال است.\n"
+        
+
+"از منوی محصولات یک آیتم انتخاب کنید.",
         parse_mode="Markdown",
         reply_markup=InlineKeyboardMarkup([[
             InlineKeyboardButton("📚 محصولات", callback_data="products"),
@@ -165,10 +209,10 @@ async def finalize_payment(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     user_id = query.from_user.id
     
-    await query.edit_message_text("⏳ در حال انتقال به درگاه پرداخت (تست)...")
+    await query.edit_message_text("⏳ در حال انتقال به درگاه پرداخت ...")
     
     # شبیه‌سازی پرداخت موفق
-    await query.message.reply_text("✅ پرداخت موفق! (تست)\nفایل در حال ارسال...")
+    await query.message.reply_text("✅ پرداخت موفق! \nفایل در حال ارسال...")
     
     try:
         with open(PDF_FILE, 'rb') as pdf:
@@ -183,7 +227,7 @@ async def finalize_payment(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if user_id not in user_data:
         user_data[user_id] = {"cart": [], "purchases": 0}
     user_data[user_id]["purchases"] += 1
-    user_data[user_id]["cart"] = []
+    user_data[user_id]["cart"] = []  # 🔥 سبد رو خالی کن
     
     # پیام به ادمین
     await context.bot.send_message(
@@ -195,26 +239,6 @@ async def finalize_payment(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"📦 محصول: کتاب آموزشی پایتون\n"
         f"💵 مبلغ: ۱۰۰,۰۰۰ تومان",
         parse_mode="Markdown"
-    )
-
-async def start_from_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    user_id = query.from_user.id
-    
-    cart_count = len(user_data.get(user_id, {}).get("cart", []))
-    
-    keyboard = [
-        [InlineKeyboardButton("📚 محصولات دیجیتال", callback_data="products")],
-        [InlineKeyboardButton(f"🛒 سبد خرید ({cart_count})", callback_data="cart")],
-        [InlineKeyboardButton("💳 پرداخت", callback_data="payment")],
-        [InlineKeyboardButton("📞 پشتیبانی", callback_data="support")],
-        [InlineKeyboardButton("👤 حساب کاربری", callback_data="profile")]
-    ]
-    
-    await query.edit_message_text(
-        f"🛍️ به فروشگاه آموزشی خوش آمدید، {query.from_user.first_name}!\n\n"
-        "لطفاً گزینه مورد نظر را انتخاب کنید:",
-        reply_markup=InlineKeyboardMarkup(keyboard)
     )
 
 def main():
@@ -232,5 +256,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-        
-
