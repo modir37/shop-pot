@@ -9,7 +9,7 @@ ADMIN_ID = int(os.getenv("ADMIN_ID"))
 PDF_FILE = "book.pdf"
 
 # ایجاد وب سرور برای Render
-web_app = Flask(name)
+web_app = Flask(__name__)  # اینجا درست شد
 
 @web_app.route('/')
 def home():
@@ -25,20 +25,21 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
 
-async def buy(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     
-    await query.edit_message_text("در حال انتقال به درگاه (تست)...")
-    await query.message.reply_text("پرداخت موفق! (تست)\nفایل در حال ارسال...")
-    
-    try:
-        with open(PDF_FILE, 'rb') as pdf:
-            await query.message.reply_document(pdf, caption="کتاب شما با موفقیت ارسال شد!")
-    except Exception as e:
-        await query.message.reply_text(f"خطا: {e}")
-    
-    await context.bot.send_message(ADMIN_ID, f"خرید جدید: {query.from_user.first_name}")
+    if query.data == "buy":
+        await query.edit_message_text("در حال انتقال به درگاه (تست)...")
+        await query.message.reply_text("پرداخت موفق! (تست)\nفایل در حال ارسال...")
+        
+        try:
+            with open(PDF_FILE, 'rb') as pdf:
+                await query.message.reply_document(pdf, caption="کتاب شما با موفقیت ارسال شد!")
+        except Exception as e:
+            await query.message.reply_text(f"خطا در ارسال فایل: {e}")
+        
+        await context.bot.send_message(ADMIN_ID, f"خرید جدید از: {query.from_user.first_name} (@{query.from_user.username})")
 
 def main():
     # اجرای وب سرور در پس‌زمینه
@@ -49,10 +50,11 @@ def main():
     # اجرای ربات تلگرام
     app = Application.builder().token(TOKEN).build()
     app.add_handler(CommandHandler("start", start))
-    app.add_handler(CallbackQueryHandler(buy, pattern="buy"))
+    app.add_handler(CallbackQueryHandler(button_handler))
     
     print("✅ ربات ۲۴ ساعته روشن شد!")
     app.run_polling(drop_pending_updates=True)
 
 if __name__ == "__main__":
     main()
+
