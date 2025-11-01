@@ -30,13 +30,11 @@ async def buy(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 def main():
     app = Application.builder().token(TOKEN).build()
-    
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CallbackQueryHandler(buy, pattern="buy"))
     
     print("✅ ربات ۲۴ ساعته روشن شد!")
-    app.run_polling()
+    app.run_polling(drop_pending_updates=True)
 
 if __name__ == "__main__":
     main()
-
