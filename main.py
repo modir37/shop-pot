@@ -2,7 +2,7 @@ import os
 import threading
 from flask import Flask
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import Updater, CommandHandler, CallbackQueryHandler
+from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes
 
 TOKEN = os.getenv("TOKEN")
 ADMIN_ID = int(os.getenv("ADMIN_ID"))
@@ -18,28 +18,28 @@ def home():
 def run_web():
     web_app.run(host='0.0.0.0', port=5000, debug=False)
 
-def start(update: Update, context):
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = [[InlineKeyboardButton("خرید کتاب - ۱۰۰,۰۰۰ تومان", callback_data="buy")]]
-    update.message.reply_text(
+    await update.message.reply_text(
         "فروشگاه آموزشی (تست)\nبرای خرید کلیک کنید:",
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
 
-def button_handler(update: Update, context):
+async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
-    query.answer()
+    await query.answer()
     
     if query.data == "buy":
-        query.edit_message_text("در حال انتقال به درگاه (تست)...")
-        query.message.reply_text("پرداخت موفق! (تست)\nفایل در حال ارسال...")
+        await query.edit_message_text("در حال انتقال به درگاه (تست)...")
+        await query.message.reply_text("پرداخت موفق! (تست)\nفایل در حال ارسال...")
         
         try:
             with open(PDF_FILE, 'rb') as pdf:
-                query.message.reply_document(pdf, caption="کتاب شما با موفقیت ارسال شد!")
+                await query.message.reply_document(pdf, caption="کتاب شما با موفقیت ارسال شد!")
         except Exception as e:
-            query.message.reply_text(f"خطا در ارسال فایل: {e}")
+            await query.message.reply_text(f"خطا در ارسال فایل: {e}")
         
-        context.bot.send_message(ADMIN_ID, f"خرید جدید از: {query.from_user.first_name}")
+        await context.bot.send_message(ADMIN_ID, f"خرید جدید از: {query.from_user.first_name}")
 
 def main():
     # اجرای وب سرور در پس‌زمینه
@@ -47,17 +47,16 @@ def main():
     web_thread.daemon = True
     web_thread.start()
     
-    # اجرای ربات تلگرام با نسخه پایدار
-    updater = Updater(TOKEN, use_context=True)
-    dp = updater.dispatcher
+    # اجرای ربات تلگرام
+    application = Application.builder().token(TOKEN).build()
     
-    dp.add_handler(CommandHandler("start", start))
-    dp.add_handler(CallbackQueryHandler(button_handler))
+    application.add_handler(CommandHandler("start", start))
+    application.add_handler(CallbackQueryHandler(button_handler))
     
     print("✅ ربات ۲۴ ساعته روشن شد!")
-    updater.start_polling()
-    updater.idle()
+    application.run_polling()
 
 if __name__ == "__main__":
     main()
+
 
