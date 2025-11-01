@@ -2,11 +2,8 @@ import os
 from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes
 
-# رازها از Replit Secrets میاد — با os.getenv
 TOKEN = os.getenv("TOKEN")
-MERCHANT_ID = os.getenv("MERCHANT_ID")
 ADMIN_ID = int(os.getenv("ADMIN_ID"))
-
 PDF_FILE = "book.pdf"
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -19,17 +16,26 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def buy(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
+    
     await query.edit_message_text("در حال انتقال به درگاه (تست)...")
     await query.message.reply_text("پرداخت موفق! (تست)\nفایل در حال ارسال...")
     
-    with open(PDF_FILE, 'rb') as pdf:
-        await query.message.reply_document(pdf, caption="کتاب شما ارسال شد!")
-
+    try:
+        with open(PDF_FILE, 'rb') as pdf:
+            await query.message.reply_document(pdf, caption="کتاب شما با موفقیت ارسال شد!")
+    except Exception as e:
+        await query.message.reply_text(f"خطا: {e}")
+    
     await context.bot.send_message(ADMIN_ID, f"خرید جدید: {query.from_user.first_name}")
 
-app = Application.builder().token(TOKEN).build()
-app.add_handler(CommandHandler("start", start))
-app.add_handler(CallbackQueryHandler(buy))
+def main():
+    app = Application.builder().token(TOKEN).build()
+    
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(CallbackQueryHandler(buy, pattern="buy"))
+    
+    print("✅ ربات ۲۴ ساعته روشن شد!")
+    app.run_polling()
 
-print("ربات ۲۴ ساعته روشن شد!")
-app.run_polling()
+if name == "main":
+    main()
